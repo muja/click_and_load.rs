@@ -3,5 +3,16 @@ name = "uget"
 version = "0.1.0"
 authors = ["Danyel Bayraktar <danyel@webhippie.de>"]
 
+[dependencies]
+iron = "*"
+router = "*"
+urlencoded = "*"
+rust-crypto = "*"
+rustc-serialize = "*"
+
+[dependencies.hyper]
+git = "https://github.com/muja/hyper"
+branch = "tcp_builder"
+
 [dependencies.duktape_sys]
 path = "../duktape-rs/duktape_sys"
