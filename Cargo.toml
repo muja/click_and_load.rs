@@ -1,0 +1,7 @@
+[package]
+name = "uget"
+version = "0.1.0"
+authors = ["Danyel Bayraktar <danyel@webhippie.de>"]
+
+[dependencies.duktape_sys]
+path = "../duktape-rs/duktape_sys"
