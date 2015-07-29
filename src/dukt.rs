@@ -19,7 +19,7 @@ impl Context {
     }
   }
 
-  pub fn clicknload(&self, source: &str) -> Result<String, &'static str> {
+  pub fn click_and_load(&self, source: &str) -> Result<String, &'static str> {
     unsafe {
       duk_push_string(self.ctx, source.replace("\n", " ").as_ptr() as *const i8);
       duk_push_string(self.ctx, "<eval>".as_ptr() as *const i8);

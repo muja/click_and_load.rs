@@ -11,8 +11,7 @@ rust-crypto = "*"
 rustc-serialize = "*"
 
 [dependencies.hyper]
-git = "https://github.com/muja/hyper"
-branch = "tcp_builder"
+git = "https://github.com/hyperium/hyper"
 
 [dependencies.duktape_sys]
 path = "../duktape-rs/duktape_sys"
