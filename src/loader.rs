@@ -48,9 +48,7 @@ impl Loader {
     }
 
     pub fn click_and_load(req: &mut Request) -> IronResult<Response> {
-        req.get_ref::<UrlEncodedBody>().or_else(|_|
-            Err("Failed to decode body")
-        ).and_then(|ref hashmap| {
+        req.get_ref::<UrlEncodedBody>().or(Err("Failed to decode body")).and_then(|ref hashmap| {
             hashmap.get("crypted").ok_or(
                 "`crypted` parameter wasn't provided in request body"
             ).and_then(|crypted| {
@@ -60,7 +58,7 @@ impl Loader {
                     "`jk` parameter wasn't provided in request body"
                 ).and_then(|jk| {
                     Loader::key_from_snippet(&jk[0])
-                }).and_then({|val|
+                }).and_then(|val| {
                     val.from_hex().or(Err("Invalid hex string."))
                 }).and_then(|key| Loader::decrypt(&key, &crypted_bytes))
             }).and_then( |links| {

@@ -4,10 +4,11 @@ extern crate router;
 extern crate hyper;
 extern crate urlencoded;
 extern crate rustc_serialize;
+extern crate duktape_sys;
 
-mod loader;
-mod dukt;
-mod server;
+pub mod loader;
+pub mod dukt;
+pub mod server;
 use server::Server;
 
 fn main() {

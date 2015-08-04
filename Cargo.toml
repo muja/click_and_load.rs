@@ -9,9 +9,7 @@ router = "*"
 urlencoded = "*"
 rust-crypto = "*"
 rustc-serialize = "*"
-
-[dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
+hyper = "*"
 
 [dependencies.duktape_sys]
-path = "../duktape-rs/duktape_sys"
+git = "https://github.com/muja/duktape-rs"
