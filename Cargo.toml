@@ -1,7 +1,11 @@
 [package]
-name = "uget"
-version = "0.1.0"
+name = "click_and_load"
+version = "0.0.1"
 authors = ["Danyel Bayraktar <danyel@webhippie.de>"]
+
+license = "MIT"
+description = "Click and Load v2 implementation"
+repository = "https://github.com/muja/click_and_load.rs"
 
 [dependencies]
 iron = "*"
@@ -10,6 +14,4 @@ urlencoded = "*"
 rust-crypto = "*"
 rustc-serialize = "*"
 hyper = "*"
-
-[dependencies.duktape_sys]
-git = "https://github.com/muja/duktape-rs"
+duktape_ffi = "*"

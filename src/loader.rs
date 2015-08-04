@@ -16,7 +16,7 @@ impl Loader {
         Context::new().and_then(|ctx| ctx.click_and_load(jk))
     }
 
-    pub fn decrypt(key: &Vec<u8>, crypted: &Vec<u8>) -> Result<Vec<String>, &'static str> {
+    pub fn decrypt(key: &Vec<u8>, crypted: &Vec<u8>) -> Result<Vec<u8>, &'static str> {
         let mut decryptor = aes::cbc_decryptor(
             aes::KeySize::KeySize128,
             key,
@@ -34,13 +34,7 @@ impl Loader {
                 write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i)
             );
             match result {
-                Ok(BufferResult::BufferUnderflow) => {
-                    return final_result.split(|&b| b == b'\n').map(|slice| {
-                        str::from_utf8(slice).map(|s| s.to_string())
-                    }).collect::<Result<Vec<String>, _>>().or(
-                        Err("Decrypted content yields non-utf8 string")
-                    )
-                },
+                Ok(BufferResult::BufferUnderflow) => return Ok(final_result),
                 Ok(_) => {}
                 Err(_) => return Err("Decryption failed")
             }
@@ -61,11 +55,17 @@ impl Loader {
                 }).and_then(|val| {
                     val.from_hex().or(Err("Invalid hex string."))
                 }).and_then(|key| Loader::decrypt(&key, &crypted_bytes))
-            }).and_then( |links| {
-                for link in links {
-                    println!("{}", link);
-                }
-                Ok(Response::with((status::Ok, "success\r\n")))
+            }).and_then( |bytes| {
+                bytes.split(|&b| b == b'\n').map(|slice| {
+                    str::from_utf8(slice).map(|s| s.into())
+                }).collect::<Result<Vec<String>, _>>().or(
+                    Err("Decrypted content yields non-utf8 string")
+                ).and_then(|links| {
+                    for link in links {
+                        println!("{}", link);
+                    }
+                    Ok(Response::with((status::Ok, "success\r\n")))
+                })
             })
         }).or_else( |err| Ok(Response::with((status::BadRequest, err))) )
     }
