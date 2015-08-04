@@ -21,8 +21,8 @@ impl Context {
 
   pub fn click_and_load(&self, source: &str) -> Result<String, &'static str> {
     unsafe {
-      duk_push_string(self.ctx, source.replace("\n", " ").as_ptr() as *const i8);
-      duk_push_string(self.ctx, "<eval>".as_ptr() as *const i8);
+      duk_push_lstring(self.ctx, source.replace("\n", " ").as_ptr() as *const i8, source.len() as u64);
+      duk_push_string(self.ctx, "<eval>\0".as_ptr() as *const i8);
       duk_eval_raw(self.ctx, 0 as *const i8, 0, DUK_COMPILE_FUNCTION);
       let ds = duk_get_string(self.ctx, 0);
       if ds == 0 as *const i8 {
