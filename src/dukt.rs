@@ -1,4 +1,4 @@
-use duktape_sys::*;
+use duktape_ffi::*;
 use std::ffi::CStr;
 use std::ptr;
 

@@ -42,6 +42,6 @@ impl Server {
     }
 
     pub fn run(self) {
-        Iron::new(self.router).http("localhost:9666").unwrap();
+        Iron::new(self.router).http("0.0.0.0:9666").unwrap();
     }
 }
