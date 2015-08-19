@@ -8,6 +8,7 @@ use urlencoded::UrlEncodedBody;
 use rustc_serialize::hex::*;
 use rustc_serialize::base64::*;
 use std::str;
+use std::io::Write;
 
 pub struct Loader;
 
@@ -64,9 +65,14 @@ impl Loader {
                     for link in links {
                         println!("{}", link);
                     }
+                    let stderr = ::std::io::stderr();
+                    writeln!(stderr.lock(), "Fetched content!").unwrap();
                     Ok(Response::with((status::Ok, "success\r\n")))
                 })
             })
-        }).or_else( |err| Ok(Response::with((status::BadRequest, err))) )
+        }).or_else( |err| {
+            warn!("Error processing request: {}", err);
+            Ok(Response::with((status::BadRequest, err)))
+        })
     }
 }

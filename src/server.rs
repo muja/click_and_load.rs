@@ -3,6 +3,7 @@ use iron::status;
 use router::Router;
 use hyper::mime::{Mime, TopLevel, SubLevel};
 use loader::Loader;
+use std::io::Write;
 
 const CROSS_DOMAIN: &'static str = "<?xml version=\"1.0\"?>
 <!DOCTYPE cross-domain-policy SYSTEM \"http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd\">
@@ -42,6 +43,9 @@ impl Server {
     }
 
     pub fn run(self) {
-        Iron::new(self.router).http("0.0.0.0:9666").unwrap();
+        let iron = Iron::new(self.router).http("0.0.0.0:9666");
+        let stderr = ::std::io::stderr();
+        writeln!(stderr.lock(), "Listening on 0.0.0.0:9666!").unwrap();
+        iron.unwrap();
     }
 }
