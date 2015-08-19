@@ -21,7 +21,7 @@ impl Loader {
             aes::KeySize::KeySize128,
             key,
             key,
-            blockmodes::PkcsPadding
+            blockmodes::NoPadding
         );
         let mut final_result = Vec::<u8>::new();
         let mut read_buffer = buffer::RefReadBuffer::new(crypted);
@@ -56,7 +56,7 @@ impl Loader {
                     val.from_hex().or(Err("Invalid hex string."))
                 }).and_then(|key| Loader::decrypt(&key, &crypted_bytes))
             }).and_then( |bytes| {
-                bytes.split(|&b| b == b'\n').map(|slice| {
+                bytes.split(|&b| b == b'\n').filter(|&xs| xs.len() > 0).map(|slice| {
                     str::from_utf8(slice).map(|s| s.into())
                 }).collect::<Result<Vec<String>, _>>().or(
                     Err("Decrypted content yields non-utf8 string")
