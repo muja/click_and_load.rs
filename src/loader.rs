@@ -89,7 +89,9 @@ impl Loader {
                       })
                       .and_then(|bytes| {
                           info!("bytes: {:?}", bytes);
-                          bytes.split(|&b| b == b'\n' || b == b'\r')
+                          // splitting at 0 byte is a workaround for a weird bug (?) where
+                          // there are a lot of trailing null chars after decryption.
+                          bytes.split(|&b| b == b'\n' || b == b'\r' || b == b'\0')
                                .filter(|&xs| xs.len() > 0)
                                .map(|slice| str::from_utf8(slice).map(|s| s.into()))
                                .collect::<Result<Vec<String>, _>>()
