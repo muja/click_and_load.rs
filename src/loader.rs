@@ -1,5 +1,6 @@
 use iron::prelude::*;
 use iron::status;
+use iron::Handler;
 use crypto::{buffer, aes, blockmodes};
 use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
 use crypto::symmetriccipher::{Decryptor, SymmetricCipherError};
@@ -8,9 +9,12 @@ use urlencoded::UrlEncodedBody;
 use rustc_serialize::hex::*;
 use rustc_serialize::base64::*;
 use std::str;
-use std::io::Write;
+use std::sync::mpsc::Sender;
+use std::sync::Mutex;
 
-pub struct Loader;
+pub struct Loader {
+    pub sender: Mutex<Sender<String>>,
+}
 
 impl Loader {
     pub fn key_from_snippet(jk: &str) -> Result<String, &'static str> {
@@ -64,8 +68,10 @@ impl Loader {
             }
         }
     }
+}
 
-    pub fn click_and_load(req: &mut Request) -> IronResult<Response> {
+impl Handler for Loader {
+    fn handle(&self, req: &mut Request) -> IronResult<Response> {
         req.get_ref::<UrlEncodedBody>()
            .or(Err("Failed to decode body"))
            .and_then(|ref hashmap| {
@@ -97,12 +103,15 @@ impl Loader {
                                .collect::<Result<Vec<String>, _>>()
                                .or(Err("Decrypted content yields non-utf8 string"))
                                .and_then(|links| {
-                                   for link in links {
-                                       println!("{}", link);
-                                   }
-                                   let stderr = ::std::io::stderr();
-                                   writeln!(stderr.lock(), "Fetched content!").unwrap();
-                                   Ok(Response::with((status::Ok, "success\r\n")))
+                                   self.sender.lock().or(Err("Internal error")).and_then(|handle| {
+                                       for link in links {
+                                           if let Err(e) = handle.send(link) {
+                                               println!("{:?}", e);
+                                               return Err("Internal error2");
+                                           }
+                                       }
+                                       Ok(Response::with((status::Ok, "success\r\n")))
+                                   })
                                })
                       })
            })
