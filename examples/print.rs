@@ -5,7 +5,9 @@ use cnl::server;
 
 fn main() {
     env_logger::init().unwrap();
-    for link in server::run().unwrap() {
-      println!("{}", link);
+    for links in server::run().unwrap() {
+        for link in links {
+            println!("{}", link);
+        }
     }
 }

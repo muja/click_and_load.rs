@@ -8,14 +8,14 @@ description = "Click and Load v2 implementation"
 repository = "https://github.com/muja/click_and_load.rs"
 
 [dependencies]
-iron = "*"
-router = "*"
-urlencoded = "*"
-rust-crypto = "*"
-rustc-serialize = "*"
-hyper = "*"
-duktape_ffi = "*"
-log = "*"
+iron = "~0.4.0"
+router = "~0.4.0"
+urlencoded = "~0.4.1"
+rust-crypto = "~0.2.36"
+rustc-serialize = "~0.3.21"
+hyper = "~0.9.12"
+duktape_ffi = "~0.0.1"
+log = "~0.3.6"
 
 [dev-dependencies]
-env_logger = "*"
+env_logger = "~0.3.5"
