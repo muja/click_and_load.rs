@@ -23,11 +23,12 @@ impl Loader {
 
     pub fn decrypt(key: &Vec<u8>, crypted: &Vec<u8>) -> Result<Vec<u8>, SymmetricCipherError> {
         debug!("key: {:?}", key);
+        let key = &key[0..16]; // trim to 128 bytes
         let mut decryptor =
-            aes::cbc_decryptor(aes::KeySize::KeySize128, key, key, blockmodes::NoPadding);
+            aes::cbc_decryptor(aes::KeySize::KeySize128, key, key, blockmodes::PkcsPadding);
         let mut final_result = Vec::<u8>::new();
         let mut read_buffer = buffer::RefReadBuffer::new(crypted);
-        let mut buffer = [0; 128];
+        let mut buffer = [0; 4096];
         let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
 
         loop {
@@ -44,9 +45,9 @@ impl Loader {
     }
 
     pub fn encrypt(bytes: &Vec<u8>) -> Result<Vec<u8>, SymmetricCipherError> {
-        let key = b"38353534337323363438353839373238";
+        let key = b"434e4c2e72732062792044616e79656c";
         let mut encryptor =
-            aes::cbc_encryptor(aes::KeySize::KeySize128, key, key, blockmodes::NoPadding);
+            aes::cbc_encryptor(aes::KeySize::KeySize128, key, key, blockmodes::PkcsPadding);
         let mut final_result = Vec::<u8>::new();
         let mut read_buffer = buffer::RefReadBuffer::new(bytes);
         let mut buffer = [0; 4096];
