@@ -23,6 +23,7 @@ impl Loader {
 
     pub fn decrypt(key: &Vec<u8>, crypted: &Vec<u8>) -> Result<Vec<u8>, SymmetricCipherError> {
         debug!("key: {:?}", key);
+        debug!("crypted: {:?}", crypted);
         let key = &key[0..16]; // trim to 128 bytes
         let mut decryptor =
             aes::cbc_decryptor(aes::KeySize::KeySize128, key, key, blockmodes::PkcsPadding);
@@ -38,7 +39,12 @@ impl Loader {
                 .iter()
                 .map(|&i| i));
             match result {
-                BufferResult::BufferUnderflow => return Ok(final_result),
+                BufferResult::BufferUnderflow => {
+                    while final_result.last() == Some(&0) {
+                        final_result.pop();
+                    }
+                    return Ok(final_result);
+                }
                 _ => {}
             }
         }
@@ -92,9 +98,7 @@ impl Handler for Loader {
                     })
                     .and_then(|bytes| {
                         info!("bytes: {:?}", bytes);
-                        // splitting at 0 byte is a workaround for a weird bug (?) where
-                        // there are a lot of trailing null chars after decryption.
-                        bytes.split(|&b| b == b'\n' || b == b'\r' || b == b'\0')
+                        bytes.split(|&b| b == b'\n' || b == b'\r')
                             .filter(|&xs| xs.len() > 0)
                             .map(|slice| str::from_utf8(slice).map(|s| s.into()))
                             .collect::<Result<Vec<String>, _>>()
