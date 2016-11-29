@@ -6,9 +6,13 @@ extern crate env_logger;
 extern crate log;
 // extern crate hyper;
 
+extern crate time;
+
 use cnl::server;
 use iron::prelude::*;
 use iron::status;
+use iron::modifiers::Header;
+use iron::headers::{LastModified, HttpDate};
 use router::Router;
 use std::sync::Mutex;
 use std::sync::Arc;
@@ -22,31 +26,35 @@ fn print(_: &mut Router, subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
 }
 
 fn last(router: &mut Router, subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
-    let last_links: Arc<Mutex<Option<Vec<String>>>> = Arc::new(Mutex::new(None));
+    let last_links: Arc<Mutex<Option<(Vec<String>, time::Tm)>>> = Arc::new(Mutex::new(None));
     let s = last_links.clone();
     subscribers.push(Box::new(move |links: &Vec<String>| {
         let guard = s.lock();
         if let Ok(mut handle) = guard {
-            *handle = Some(links.to_owned());
+            *handle = Some((links.to_owned(), time::now()));
         }
     }));
     let r = last_links.clone();
-    router.get("/last", move |_: &mut Request| {
+    router.get("/last",
+               move |_: &mut Request| {
         let guard = r.lock();
         if let Ok(handle) = guard {
             if let Some(ref links) = *handle {
-                Ok(Response::with((status::Ok, links.join("\n"))))
+                Ok(Response::with((status::Ok,
+                                   Header(LastModified(HttpDate(links.1))),
+                                   links.0.join("\n"))))
             } else {
                 Ok(Response::with((status::NotFound, "")))
             }
         } else {
             Ok(Response::with((status::InternalServerError, "Failed to acquire lock")))
         }
-    }, "last");
+    },
+               "last");
 }
 
 fn next(router: &mut Router, cnl_subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
-    let subs : Arc<Mutex<Vec<Sender<Vec<String>>>>> = Arc::new(Mutex::new(Vec::new()));
+    let subs: Arc<Mutex<Vec<Sender<Vec<String>>>>> = Arc::new(Mutex::new(Vec::new()));
     let x = subs.clone();
     cnl_subscribers.push(Box::new(move |links: &Vec<String>| {
         let guard = x.lock();
@@ -58,7 +66,8 @@ fn next(router: &mut Router, cnl_subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
         }
     }));
     let y = subs.clone();
-    router.get("/next", move |_: &mut Request| {
+    router.get("/next",
+               move |_: &mut Request| {
         let recv = {
             let guard = y.lock();
             if let Ok(mut handle) = guard {
@@ -75,7 +84,8 @@ fn next(router: &mut Router, cnl_subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
             warn!("COULDN'T RECEIVE");
             Ok(Response::with((status::InternalServerError, "Failed to acquire lock")))
         }
-    }, "next");
+    },
+               "next");
 }
 
 fn main() {
