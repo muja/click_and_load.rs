@@ -1,21 +1,28 @@
 [package]
 name = "click_and_load"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Danyel Bayraktar <cydrop@gmail.com>"]
+edition = "2021"
 
 license = "MIT"
 description = "Click and Load v2 implementation"
 repository = "https://github.com/muja/click_and_load.rs"
 
 [dependencies]
-iron = "~0.4.0"
-router = "~0.4.0"
-urlencoded = "~0.4.1"
-rust-crypto = "~0.2.36"
-rustc-serialize = "~0.3.21"
-hyper = "~0.9.12"
-duktape_ffi = "~0.0.1"
-log = "~0.3.6"
+hyper = { version = "0.14.26", features = ["full"] }
+tracing = "0.1.37"
+aes = "0.8.3"
+cbc = "0.1.2"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+axum = "0.6.18"
+base64 = "0.21.3"
+hex = "0.4.3"
+serde = { version = "1.0.164", features = ["derive"] }
+tokio = "1.29.1"
+futures = "0.3.28"
+boa_engine = "0.16.0"
 
 [dev-dependencies]
-env_logger = "~0.3.5"
+tokio = { version = "1.29.1", features = ["full"] }
+axum = { version = "0.6.18", features = ["headers"] }
+time = "0.3.22"

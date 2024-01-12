@@ -1,93 +1,91 @@
-extern crate click_and_load as cnl;
-extern crate iron;
-extern crate router;
-extern crate env_logger;
+use click_and_load as cnl;
 #[macro_use]
-extern crate log;
+extern crate tracing;
 // extern crate hyper;
 
 use cnl::server;
-use iron::prelude::*;
-use iron::status;
-use router::Router;
-use std::sync::Mutex;
+use futures::channel::mpsc::{self, UnboundedSender};
+use futures::{StreamExt, SinkExt};
+use hyper::StatusCode;
 use std::sync::Arc;
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
+use std::sync::Mutex;
 
-fn print(_: &mut Router, subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
-    subscribers.push(Box::new(|links: &Vec<String>| {
-        println!("{}", links.join("\n"));
-    }));
-}
-
-fn last(router: &mut Router, subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
-    let last_links: Arc<Mutex<Option<Vec<String>>>> = Arc::new(Mutex::new(None));
+fn last(router: axum::Router, subscribers: &mut Vec<Box<dyn Fn(Vec<String>)>>) -> axum::Router {
+    let last_links: Arc<Mutex<Option<(Vec<String>, time::OffsetDateTime)>>> =
+        Arc::new(Mutex::new(None));
     let s = last_links.clone();
-    subscribers.push(Box::new(move |links: &Vec<String>| {
-        let guard = s.lock();
-        if let Ok(mut handle) = guard {
-            *handle = Some(links.to_owned());
-        }
+    subscribers.push(Box::new(move |links: Vec<String>| {
+        let s = s.clone();
+        let mut handle = s.lock().unwrap();
+        *handle = Some((links.to_owned(), time::OffsetDateTime::now_utc()));
     }));
     let r = last_links.clone();
-    router.get("/last", move |_: &mut Request| {
-        let guard = r.lock();
-        if let Ok(handle) = guard {
+    router.route(
+        "/last",
+        axum::routing::get(|| async move {
+            let handle = r.lock().unwrap();
             if let Some(ref links) = *handle {
-                Ok(Response::with((status::Ok, links.join("\n"))))
+                Ok(links.0.join("\n"))
             } else {
-                Ok(Response::with((status::NotFound, "")))
+                Err((StatusCode::NOT_FOUND, "Not found"))
             }
-        } else {
-            Ok(Response::with((status::InternalServerError, "Failed to acquire lock")))
-        }
-    }, "last");
+        }),
+    )
 }
 
-fn next(router: &mut Router, cnl_subscribers: &mut Vec<Box<Fn(&Vec<String>)>>) {
-    let subs : Arc<Mutex<Vec<Sender<Vec<String>>>>> = Arc::new(Mutex::new(Vec::new()));
-    let x = subs.clone();
-    cnl_subscribers.push(Box::new(move |links: &Vec<String>| {
-        let guard = x.lock();
-        if let Ok(mut handle) = guard {
-            for sub in handle.to_owned() {
-                sub.send(links.to_owned()).unwrap();
-            }
-            *handle = Vec::new();
+fn next(router: axum::Router, cnl_subscribers: &mut Vec<Box<dyn Fn(Vec<String>)>>) -> axum::Router {
+    let subs: Arc<Mutex<Vec<UnboundedSender<Vec<String>>>>> = Arc::new(Mutex::new(Vec::new()));
+    let sub = subs.clone();
+    cnl_subscribers.push(Box::new(move |links: Vec<String>| {
+        let mut handle = sub.lock().unwrap();
+        for mut sub in handle.to_owned() {
+            let links = links.to_owned();
+            tokio::spawn(async move {
+                sub.send(links).await.unwrap()
+            });
         }
+        *handle = Vec::new();
     }));
-    let y = subs.clone();
-    router.get("/next", move |_: &mut Request| {
-        let recv = {
-            let guard = y.lock();
-            if let Ok(mut handle) = guard {
-                let (send, recv) = mpsc::channel();
-                handle.push(send);
+    let subs = subs.clone();
+    router.route(
+        "/next",
+        axum::routing::get(|| async move {
+            let mut recv = {
+                let (send, recv) = mpsc::unbounded::<Vec<String>>();
+                subs.lock().unwrap().push(send);
                 recv
+            };
+            if let Some(vec) = recv.next().await {
+                Ok(vec.join("\n"))
             } else {
-                return Ok(Response::with((status::InternalServerError, "Failed to acquire lock")));
+                warn!("COULDN'T RECEIVE");
+                Err("Failed to acquire lock")
             }
-        };
-        if let Ok(vec) = recv.recv() {
-            Ok(Response::with((status::Ok, vec.join("\n"))))
-        } else {
-            warn!("COULDN'T RECEIVE");
-            Ok(Response::with((status::InternalServerError, "Failed to acquire lock")))
-        }
-    }, "next");
+        }),
+    )
 }
 
-fn main() {
-    env_logger::init().unwrap();
-    let mut router = Router::new();
+#[tokio::main]
+async fn main() {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(
+            "trace"
+                .parse::<tracing_subscriber::EnvFilter>()
+                .unwrap(),
+        )
+        .with_writer(std::io::stderr)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let mut subscribers = Vec::new();
-    last(&mut router, &mut subscribers);
-    // print(&mut router, &mut subscribers);
-    next(&mut router, &mut subscribers);
-    for links in server::run_with(router).unwrap() {
+    let mut router = axum::Router::new();
+    router = last(router, &mut subscribers);
+    router = next(router, &mut subscribers);
+    let (mut recv, router) = server::mount(router);
+    let handle = tokio::spawn(server::server(None).serve(router.into_make_service()));
+    while let Some(links) = recv.next().await {
         for sub in &subscribers {
-            sub(&links);
+            sub(links.clone());
         }
     }
+    handle.await.unwrap().unwrap();
 }

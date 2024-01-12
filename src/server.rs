@@ -1,60 +1,52 @@
-use std::thread;
-use iron::prelude::*;
-use iron::status;
-use iron::error::HttpError;
-use router::Router;
-use hyper::mime::{Mime, TopLevel, SubLevel};
-use loader::Loader;
-use std::io::Write;
-use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
-use std::sync::Mutex;
+use axum::http::HeaderMap;
+use axum::routing::IntoMakeService;
+use axum::Router;
+use futures::channel::mpsc::Receiver;
+use hyper::server::conn::AddrIncoming;
+use hyper::Server;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-const CROSS_DOMAIN: &'static str = "<?xml version=\"1.0\"?>
-<!DOCTYPE cross-domain-policy SYSTEM \
-                                    \"http://www.macromedia.com/xml/dtds/cross-domain-policy.\
-                                    dtd\">
+const CROSS_DOMAIN: &'static str = r#"<?xml version="1.0"?>
+<!DOCTYPE cross-domain-policy SYSTEM "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
 <cross-domain-policy>
-<allow-access-from domain=\"*\" \
-                                    />
-</cross-domain-policy>
-";
+<allow-access-from domain="*"/>
+</cross-domain-policy>"#;
 
-pub fn mount(router: &mut Router) -> Receiver<Vec<String>> {
-    let (send, recv) = mpsc::channel();
-    let loader = Loader { sender: Mutex::new(send) };
-    router.get("/flash",
-               |_: &mut Request| Ok(Response::with((status::Ok, "CNL.RS"))),
-               "flash");
-    router.get("/jdcheck.js",
-               |_: &mut Request| {
-                   Ok(Response::with((status::Ok, "jdownloader = true;"))
-                       .set(Mime(TopLevel::Text, SubLevel::Javascript, vec![])))
-               },
-               "jdcheck");
-    router.get("/crossdomain.xml",
-               |_: &mut Request| {
-                   Ok(Response::with((status::Ok, CROSS_DOMAIN))
-                       .set(Mime(TopLevel::Text, SubLevel::Html, vec![])))
-               },
-               "crossdomain");
-    router.post("/flash/addcrypted2", loader, "addcrypted2");
-
-    recv
+pub fn mount(router: axum::Router) -> (Receiver<Vec<String>>, axum::Router) {
+    let (send, recv) = futures::channel::mpsc::channel(1);
+    let loader =
+        axum::handler::Handler::with_state(crate::loader::handle, Arc::new(Mutex::new(send)));
+    (
+        recv,
+        router
+            .route("/flash", axum::routing::get(|| async { "CNL.RS" }))
+            .route(
+                "/jdcheck.js",
+                axum::routing::get(|| async {
+                    let mut headers = HeaderMap::new();
+                    headers.insert("Content-Type", "application/javascript".parse().unwrap());
+                    (headers, "jdownloader = true;")
+                }),
+            )
+            .route(
+                "/crossdomain.xml",
+                axum::routing::get(|| async { CROSS_DOMAIN }),
+            )
+            .route_service("/flash/addcrypted2", loader),
+    )
 }
 
-pub fn run_with(mut router: Router) -> Result<Receiver<Vec<String>>, HttpError> {
-    let rec = mount(&mut router);
-    let iron = try!(Iron::new(router).http("0.0.0.0:9666"));
-    thread::spawn(move || {
-        let stderr = ::std::io::stderr();
-        writeln!(stderr.lock(), "Listening on 0.0.0.0:9666!").unwrap();
-        iron
-    });
-    Ok(rec)
+pub fn server(addr: Option<&str>) -> hyper::server::Builder<AddrIncoming> {
+    hyper::Server::bind(&addr.unwrap_or("0.0.0.0:9666").parse().unwrap())
 }
 
-pub fn run() -> Result<Receiver<Vec<String>>, HttpError> {
-    let router = Router::new();
-    run_with(router)
+pub fn run() -> (
+    Receiver<Vec<String>>,
+    Server<AddrIncoming, IntoMakeService<Router>>,
+) {
+    let router = axum::Router::new();
+    let (rec, router) = mount(router);
+    let server = server(None).serve(router.into_make_service());
+    (rec, server)
 }
