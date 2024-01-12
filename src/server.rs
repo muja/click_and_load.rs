@@ -1,3 +1,4 @@
+use axum::http::HeaderMap;
 use axum::routing::IntoMakeService;
 use axum::Router;
 use futures::channel::mpsc::Receiver;
@@ -22,7 +23,11 @@ pub fn mount(router: axum::Router) -> (Receiver<Vec<String>>, axum::Router) {
             .route("/flash", axum::routing::get(|| async { "CNL.RS" }))
             .route(
                 "/jdcheck.js",
-                axum::routing::get(|| async { "jdownloader = true;" }),
+                axum::routing::get(|| async {
+                    let mut headers = HeaderMap::new();
+                    headers.insert("Content-Type", "application/javascript".parse().unwrap());
+                    (headers, "jdownloader = true;")
+                }),
             )
             .route(
                 "/crossdomain.xml",
